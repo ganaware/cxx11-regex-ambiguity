@@ -1,0 +1,193 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <title>C++11 の正規表現ライブラリの曖昧さ</title>
+    <style type="text/css"><!--
+      body { margin: 2em; }
+      h2 { border-style: solid none none none; border-width: 1px; padding-top: 0.5em; }
+      dl { margin-left: 2em; }
+      dt { margin-top: 1em; font-weight: bold; }
+    --></style>
+  </head>
+  <body>
+    <h1>C++11 の正規表現ライブラリの曖昧さ</h1>
+
+    <h2>概要</h2>
+
+    <p>C++11 の正規表現ライブラリの仕様の曖昧な部分を指摘し、現実の実装のぶれを例示します。</p>
+
+    <h2>Multiline</h2>
+
+    <h3>定義</h3>
+
+    <p>ECMA-262 では、Multiline について以下のような定義が存在します。</p>
+
+    <dl>
+      <dt>§15.10.2.6 (ECMA-262)</dt>
+      <dd>
+	Multiline が true の場合 <code>^</code> や <code>$</code> は改行文字の直後や直前にもそれぞれマッチし、
+	false ならばマッチしない。(文字列の先頭と最後にはそれぞれ常にマッチする)
+      </dd>
+
+      <dt>§15.10.4.1, §15.10.7.4 (ECMA-262)</dt>
+      <dd>
+	新しく作られた正規表現オブジェクトのフラグに "m" が指定されている場合、
+	multiline プロパティは true, そうでなければ false。
+	(つまり、デフォルトでは false)
+      </dd>
+    </dl>
+
+    <p>ところが C++11 n3485 には Multiline についての言及はありません。</p>
+
+    <p>
+      したがって ECMA-262 のデフォルトの動作、つまり Multiline=false が C++11 で期待される動作ということになるので、
+      <code>^</code> や <code>$</code> は改行文字の直後や直前にはそれぞれ決してマッチしないということになります。
+    </p>
+
+    <h3>現実の実装</h3>
+
+    <dl>
+      <dt>Multiline=false</dt>
+      <dd>
+	<ul>
+	  <li>libstdc++ r203261
+	  <li>libc++ r192176
+	</ul>
+      </dd>
+
+      <dt>Multiline=true</dt>
+      <dd>
+	<ul>
+	  <li>Visual Studio Express 2013 RC
+	  <li>(参考情報) boost 1.53
+	</ul>
+      </dd>
+    </dl>
+
+    <h3>問題点</h3>
+
+    <p>Multiline=false であると解釈すると、以下のフラグの存在意義がなくなります。</p>
+
+    <dl>
+      <dt>§28.5.2 [re.matchflag] match_not_bol</dt>
+      <dd><code>^</code> が文字列の先頭にマッチしないようにする。</dd>
+      <dt>§28.5.2 [re.matchflag] match_not_eol</dt>
+      <dd><code>$</code> が文字列の最後にマッチしないようにする。</dd>
+    </dl>
+
+    <p>
+      これらのフラグを使用した場合、
+      <code>^</code> や <code>$</code> は決してマッチしない正規表現ということになり実用的な意味が失われます。
+    </p>
+
+    <p>
+      ところが Multiline=true であると解釈すれば、
+      改行文字を含む長い文章の一部を取り出した文字列に対してマッチを行うことを考えた場合に
+      <code>^</code> や <code>$</code> が改行の直後や直前にマッチするので、
+      行単位のマッチを行うことが可能になります。
+    </p>
+
+    <p>
+      たとえば regex_replace や regex_iterator などで改行を含む文章を処理する場合に役に立つことが予想されます。
+    </p>
+
+    <h3>まとめ</h3>
+
+    <p>
+      仕様策定時点では Multiline=true を想定していたのではないか、
+      という推測ができますが現在の仕様では false になってしまうので現実実装に混乱が生じています。
+      曖昧な仕様を明確にする必要があります。
+    </p>
+
+    <h3>参考文献</h3>
+
+    <ul>
+      <li><a href="http://stackoverflow.com/questions/11959918/matching-beginning-of-line-using-libc-regex-library-c11/11962425">Matching “beginning-of-line” using libc++ regex library (C++11)</a>
+    </ul>
+
+    <h2>regex_match</h2>
+
+    <h3>定義</h3>
+
+    <p>C++11 n3485 §28.11.2 [re.alg.match] p2 では regex_match について次のような定義がなされています。</p>
+
+    <blockquote>
+      Effects: Determines whether there is a match between the regular expression e, and all of the character sequence [first,last). The parameter flags is used to control how the expression is matched against the character sequence. Returns true if such a match exists, false otherwise.
+    </blockquote>
+
+    <p>この文章の前半は異なる解釈をすることが可能です。</p>
+
+    <ol>
+      <li>正規表現 e で入力文字列を検索 (regex_search) する。その検索が成功した場合に、その検索結果が文字列全体と一致している場合は true を返す。
+      <li>正規表現 e の最後にまるで <code>\z</code> が追加されているかのように動作する。(<code>\z</code> は Perl の正規表現で、文字列の最後のみにマッチする)
+    </ol>
+
+    <p>この解釈のぶれによって ECMAScript フラグで作成された正規表現に以下のような微妙な違いが生じます。</p>
+
+    <pre>std::regex e("Get|GetValue");</pre>
+
+    <dl>
+      <dt>regex_search を使用した場合</dt>
+      <dd>
+	この正規表現は <code>"GetValue"</code> 全体にマッチすることはありません。
+	というのは、ECMAScript では左側から順番にマッチするかどうかを判定し、最初に見つかったマッチが採用されるからです。
+	したがって <code>|</code> の左側の <code>"Get"</code> がマッチするので、
+	右側の <code>"GetValue"</code> が考慮されることはありません。
+      </dd>
+
+      <dt>1 の解釈の regex_match の場合</dt>
+      <dd>
+	検索結果は regex_search と同じなので <code>"Get"</code> となります。<code>"Get"</code> は文字列全体ではないので、false を返します。
+      </dd>
+
+      <dt>2 の解釈の regex_match の場合</dt>
+      <dd>
+	正規表現 e の最後にまるで <code>\z</code> が追加されているかのように動作、
+	つまり e が <code>(?:Get|GetValue)\z</code> であるかのように動作するので
+	その検索結果は <code>"GetValue"</code> となります。
+	マッチが成功したので true を返します。
+      </dd>
+    </dl>
+
+    <h3>現実の実装</h3>
+
+    <dl>
+      <dt>1 の解釈</dt>
+      <dd>
+	<ul>
+	  <li>libc++ r192176
+	</ul>
+      </dd>
+
+      <dt>2 の解釈</dt>
+      <dd>
+	<ul>
+	  <li>libstdc++ r203261
+	  <li>Visual Studio Express 2013 RC
+	  <li>(参考情報) boost 1.53
+	</ul>
+      </dd>
+    </dl>
+
+    <h3>まとめ</h3>
+
+    <p>
+      仕様が曖昧といえば曖昧であるものの、1 の解釈を行うのはかなり無理があるのではないかと思います。
+      この問題は C++ 標準化委員会に既に報告されています。
+    </p>
+
+    <h3>参考文献</h3>
+
+    <ul>
+      <li><a href="http://cplusplus.github.io/LWG/lwg-toc.html">cplusplus.github.io/LWG/lwg-toc.html の 2273</a>
+      <li><a href="http://stackoverflow.com/questions/17609325/on-libc-why-does-regex-matchtournament-regextourtotournament-fail">On libc++, why does regex_match(“tournament”, regex(“tour|to|tournament”)) fail?</a>
+    </ul>
+
+    <h2>付録</h2>
+
+    <ul>
+      <li><a href="test.cpp.txt">実験に使用した test.cpp</a>
+    </ul>
+  </body>
+</html>
