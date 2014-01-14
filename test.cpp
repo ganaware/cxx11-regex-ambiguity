@@ -57,9 +57,9 @@ int main() {
 	return 0;
 }
 
-// libstdc++ r203261
+// libstdc++ r206594
 //
-//		$ <path-to-4.8.1>/g++ -std=c++11 -static test.cpp && ./a.out
+//		$ <path-to-4.8.2>/g++ -std=c++11 -static test.cpp && ./a.out
 //		(1) Does '^' match newlines ?
 //		false
 //		(2) Does '$' match newlines ?
@@ -69,7 +69,7 @@ int main() {
 //		(4) Does a regex_match works as if the pattern was followed by \z of Perl ?
 //		true
 
-// libc++ r192176
+// libc++ r199174
 //
 //		$ export DYLD_LIBRARY_PATH=<path-to-libcxx>/lib
 //		$ clang++ -std=c++11 -stdlib=libc++ -nostdinc++ -I<path-to-libcxx>/include -L<path-to-libcxx>/lib test.cpp && ./a.out
@@ -82,9 +82,10 @@ int main() {
 //		(4) Does a regex_match works as if the pattern was followed by \z of Perl ?
 //		false
 
-// boost 1.53
+// boost 1.55
 //
-//		$ g++ -DUSE_BOOST test.cpp -llibboost_regex-mt && ./a.exe
+//		$ PATH=<path-to-boost-prefix>/bin:$PATH
+//		$ g++ -DUSE_BOOST test.cpp -I<path-to-boost-prefix>/include -L<path-to-boost-prefix>/lib -llibboost_regex; ./a.exe
 //		(1) Does '^' match newlines ?
 //		true
 //		(2) Does '$' match newlines ?
@@ -94,7 +95,7 @@ int main() {
 //		(4) Does a regex_match works as if the pattern was followed by \z of Perl ?
 //		true
 
-// Visual Studio Express 2013 RC
+// Visual Studio Express 2013
 //
 //		(1) Does '^' match newlines ?
 //		true
